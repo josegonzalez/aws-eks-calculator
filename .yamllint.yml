@@ -1,0 +1,9 @@
+---
+extends: default
+ignore:
+  - .krew.yaml
+  - dist/
+rules:
+  line-length: disable
+  truthy:
+    check-keys: false
