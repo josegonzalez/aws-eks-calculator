@@ -2,6 +2,13 @@
 
 A terminal UI for estimating the cost of AWS EKS Capabilities (ArgoCD, ACK, kro) vs self-managed alternatives. Assumes existing EKS clusters.
 
+## Screenshots
+
+| | |
+|---|---|
+| <a href="docs/screenshots/argocd.png"><img src="docs/screenshots/argocd.png" width="400"><br>ArgoCD</a> | <a href="docs/screenshots/ack.png"><img src="docs/screenshots/ack.png" width="400"><br>ACK</a> |
+| <a href="docs/screenshots/kro.png"><img src="docs/screenshots/kro.png" width="400"><br>kro</a> | |
+
 ## Install
 
 ```sh
