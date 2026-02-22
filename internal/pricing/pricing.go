@@ -64,6 +64,12 @@ func DefaultRates() Rates {
 	}
 }
 
+// loadDefaultConfig and newPricingClient are package-level vars for testing.
+var loadDefaultConfig = config.LoadDefaultConfig
+var newPricingClient = func(cfg aws.Config) PricingAPI {
+	return pricing.NewFromConfig(cfg)
+}
+
 // PricingAPI is the interface for the AWS Pricing GetProducts call.
 type PricingAPI interface {
 	GetProducts(ctx context.Context, params *pricing.GetProductsInput, optFns ...func(*pricing.Options)) (*pricing.GetProductsOutput, error)
@@ -80,12 +86,12 @@ func FetchRates(ctx context.Context, region string) (Rates, error) {
 		}
 	}
 
-	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion("us-east-1"))
+	cfg, err := loadDefaultConfig(ctx, config.WithRegion("us-east-1"))
 	if err != nil {
 		return DefaultRates(), nil
 	}
 
-	client := pricing.NewFromConfig(cfg)
+	client := newPricingClient(cfg)
 	rates, err := FetchRatesWithClient(ctx, client, region)
 	if err != nil {
 		return rates, nil
@@ -249,7 +255,7 @@ func fetchFargate(ctx context.Context, client PricingAPI, region string) (vcpuRa
 
 	vcpuRate, err = fetchSingleRate(ctx, client, vcpuInput)
 	if err != nil {
-		return 0, 0, fmt.Errorf("Fargate vCPU: %w", err)
+		return 0, 0, fmt.Errorf("fargate vCPU: %w", err)
 	}
 
 	memInput := &pricing.GetProductsInput{
@@ -276,7 +282,7 @@ func fetchFargate(ctx context.Context, client PricingAPI, region string) (vcpuRa
 
 	memRate, err = fetchSingleRate(ctx, client, memInput)
 	if err != nil {
-		return 0, 0, fmt.Errorf("Fargate memory: %w", err)
+		return 0, 0, fmt.Errorf("fargate memory: %w", err)
 	}
 
 	return vcpuRate, memRate, nil

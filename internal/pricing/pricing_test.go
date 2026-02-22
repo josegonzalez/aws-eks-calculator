@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/pricing"
 
 	"github.com/josegonzalez/aws-eks-calculator/internal/calculator"
@@ -417,7 +421,7 @@ func (m *paginatedMockPricingAPI) GetProducts(ctx context.Context, params *prici
 
 	pageIdx := 0
 	if params.NextToken != nil {
-		fmt.Sscanf(*params.NextToken, "%d", &pageIdx)
+		_, _ = fmt.Sscanf(*params.NextToken, "%d", &pageIdx)
 	}
 
 	if pageIdx >= len(m.pages) {
@@ -558,6 +562,112 @@ func TestFetchRatesZeroRateProducts(t *testing.T) {
 	}
 }
 
+func TestParseRateMalformedJSON(t *testing.T) {
+	_, err := parseRate("{invalid}")
+	if err == nil {
+		t.Fatal("expected error for malformed JSON")
+	}
+}
+
+func TestExtractRateInvalidUSD(t *testing.T) {
+	doc := productDoc{}
+	doc.Terms.OnDemand = map[string]struct {
+		PriceDimensions map[string]struct {
+			PricePerUnit map[string]string `json:"pricePerUnit"`
+			Unit         string            `json:"unit"`
+		} `json:"priceDimensions"`
+	}{
+		"offer1": {
+			PriceDimensions: map[string]struct {
+				PricePerUnit map[string]string `json:"pricePerUnit"`
+				Unit         string            `json:"unit"`
+			}{
+				"dim1": {
+					PricePerUnit: map[string]string{"USD": "notanumber"},
+					Unit:         "Hour",
+				},
+			},
+		},
+	}
+
+	_, err := extractRateFromDoc(doc)
+	if err == nil {
+		t.Fatal("expected error for invalid USD value")
+	}
+}
+
+func TestFetchSingleRateClientError(t *testing.T) {
+	mock := &mockPricingAPI{err: fmt.Errorf("connection refused")}
+	svc := "AmazonECS"
+	_, err := fetchSingleRate(context.Background(), mock, &pricing.GetProductsInput{
+		ServiceCode: &svc,
+	})
+	if err == nil {
+		t.Fatal("expected error from client")
+	}
+}
+
+func TestFetchFargateVCPUError(t *testing.T) {
+	// EKS succeeds, Fargate vCPU call returns error via selective mock
+	mock := &selectiveErrorMock{
+		responses: allCapabilityProducts("us-east-1"),
+		errOn:     "AmazonECS:regionCode=us-east-1:productFamily=Compute:cputype=perCPU",
+	}
+
+	rates, err := FetchRatesWithClient(context.Background(), mock, "us-east-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Fargate rates should remain defaults since vCPU fetch failed
+	defaults := DefaultRates()
+	if rates.FargateVCPUPerHour != defaults.FargateVCPUPerHour {
+		t.Errorf("FargateVCPUPerHour should be default, got %f", rates.FargateVCPUPerHour)
+	}
+}
+
+func TestFetchFargateMemError(t *testing.T) {
+	// EKS succeeds, Fargate vCPU succeeds, but memory call returns error
+	mock := &selectiveErrorMock{
+		responses: allCapabilityProducts("us-east-1"),
+		errOn:     "AmazonECS:regionCode=us-east-1:productFamily=Compute:memorytype=perGB",
+	}
+
+	rates, err := FetchRatesWithClient(context.Background(), mock, "us-east-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Fargate rates should remain defaults since memory fetch failed
+	defaults := DefaultRates()
+	if rates.FargateMemGBPerHour != defaults.FargateMemGBPerHour {
+		t.Errorf("FargateMemGBPerHour should be default, got %f", rates.FargateMemGBPerHour)
+	}
+}
+
+// selectiveErrorMock returns an error only for a specific key.
+type selectiveErrorMock struct {
+	responses map[string]*pricing.GetProductsOutput
+	errOn     string
+}
+
+func (m *selectiveErrorMock) GetProducts(ctx context.Context, params *pricing.GetProductsInput, optFns ...func(*pricing.Options)) (*pricing.GetProductsOutput, error) {
+	key := *params.ServiceCode
+	for _, f := range params.Filters {
+		key += ":" + *f.Field + "=" + *f.Value
+	}
+
+	if key == m.errOn {
+		return nil, fmt.Errorf("selective error on %s", key)
+	}
+
+	if resp, ok := m.responses[key]; ok {
+		return resp, nil
+	}
+
+	return &pricing.GetProductsOutput{PriceList: []string{}}, nil
+}
+
 func TestFetchPartialCapabilityFailure(t *testing.T) {
 	// Only ArgoCD products available; ACK and kro missing
 	mock := &mockPricingAPI{
@@ -595,5 +705,139 @@ func TestFetchPartialCapabilityFailure(t *testing.T) {
 	}
 	if rates.KroBasePerHour != defaults.KroBasePerHour {
 		t.Errorf("KroBasePerHour should be default on failure")
+	}
+}
+
+func TestNewPricingClientDefault(t *testing.T) {
+	client := newPricingClient(aws.Config{})
+	if client == nil {
+		t.Error("newPricingClient should return a non-nil client")
+	}
+}
+
+func TestFetchRatesConfigError(t *testing.T) {
+	origLoad := loadDefaultConfig
+	defer func() { loadDefaultConfig = origLoad }()
+
+	loadDefaultConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, fmt.Errorf("no credentials")
+	}
+
+	rates, err := FetchRates(context.Background(), "config-error-test-region")
+	if err != nil {
+		t.Fatalf("FetchRates should not return error on config failure, got %v", err)
+	}
+	defaults := DefaultRates()
+	if rates != defaults {
+		t.Errorf("expected default rates, got %+v", rates)
+	}
+}
+
+func TestFetchRatesClientSuccess(t *testing.T) {
+	origLoad := loadDefaultConfig
+	origClient := newPricingClient
+	defer func() {
+		loadDefaultConfig = origLoad
+		newPricingClient = origClient
+	}()
+
+	region := fmt.Sprintf("client-success-%d", time.Now().UnixNano())
+	mock := &mockPricingAPI{responses: allCapabilityProducts(region)}
+
+	loadDefaultConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, nil
+	}
+	newPricingClient = func(cfg aws.Config) PricingAPI {
+		return mock
+	}
+
+	got, err := FetchRates(context.Background(), region)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ArgoCDBasePerHour != 0.03 {
+		t.Errorf("expected ArgoCD rate 0.03, got %f", got.ArgoCDBasePerHour)
+	}
+
+	// Clean up cached entry
+	c := NewCache()
+	_ = os.Remove(c.path(region))
+}
+
+func TestFetchRatesClientError(t *testing.T) {
+	origLoad := loadDefaultConfig
+	origClient := newPricingClient
+	defer func() {
+		loadDefaultConfig = origLoad
+		newPricingClient = origClient
+	}()
+
+	region := fmt.Sprintf("client-error-%d", time.Now().UnixNano())
+	loadDefaultConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, nil
+	}
+	newPricingClient = func(cfg aws.Config) PricingAPI {
+		return &mockPricingAPI{err: fmt.Errorf("access denied")}
+	}
+
+	got, err := FetchRates(context.Background(), region)
+	if err != nil {
+		t.Fatalf("FetchRates should not return error on client failure, got %v", err)
+	}
+	defaults := DefaultRates()
+	if got.ArgoCDBasePerHour != defaults.ArgoCDBasePerHour {
+		t.Errorf("expected default rates, got %+v", got)
+	}
+}
+
+func TestFetchRatesCacheHit(t *testing.T) {
+	c := NewCache()
+	rates := DefaultRates()
+	rates.ArgoCDBasePerHour = 0.42
+	if err := c.Save("ap-south-1", rates); err != nil {
+		t.Fatalf("cache save: %v", err)
+	}
+
+	got, err := FetchRates(context.Background(), "ap-south-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ArgoCDBasePerHour != 0.42 {
+		t.Errorf("expected cached rate 0.42, got %f", got.ArgoCDBasePerHour)
+	}
+
+	// Clean up
+	_ = c.Save("ap-south-1", Rates{}) // overwrite with empty to not affect other tests
+}
+
+func TestFetchRatesCacheStale(t *testing.T) {
+	// Save rates with missing capability fields — HasAllCapabilityRates returns false
+	c := NewCache()
+	staleRates := Rates{
+		ArgoCDBasePerHour:   0.03,
+		ArgoCDAppPerHour:    0.0015,
+		FargateVCPUPerHour:  0.04048,
+		FargateMemGBPerHour: 0.004446,
+		// ACK and KRO fields are zero
+	}
+	if err := c.Save("stale-test-region", staleRates); err != nil {
+		t.Fatalf("cache save: %v", err)
+	}
+
+	// FetchRates should fall through to client since HasAllCapabilityRates is false.
+	// Since loadDefaultConfig will likely fail without AWS creds, we get defaults.
+	origLoad := loadDefaultConfig
+	defer func() { loadDefaultConfig = origLoad }()
+	loadDefaultConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, fmt.Errorf("no creds")
+	}
+
+	got, err := FetchRates(context.Background(), "stale-test-region")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defaults := DefaultRates()
+	if got != defaults {
+		t.Errorf("expected default rates on stale cache + config error, got %+v", got)
 	}
 }

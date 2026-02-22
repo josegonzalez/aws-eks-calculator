@@ -1,6 +1,9 @@
 package export
 
 import (
+	"bytes"
+	"errors"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -117,5 +120,73 @@ func TestToCSVACK(t *testing.T) {
 	content := string(data)
 	if !strings.Contains(content, "ACK Test,ACK,") {
 		t.Error("missing ACK capability in CSV")
+	}
+}
+
+// failWriter returns an error on every Write call.
+type failWriter struct{}
+
+func (f *failWriter) Write(p []byte) (int, error) {
+	return 0, errors.New("write failed")
+}
+
+func TestWriteCSVWriteError(t *testing.T) {
+	err := writeCSV(&failWriter{}, []Scenario{testScenario()})
+	if err == nil {
+		t.Error("expected error from write")
+	}
+}
+
+func TestWriteCSVSuccess(t *testing.T) {
+	var buf bytes.Buffer
+	err := writeCSV(&buf, []Scenario{testScenario()})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "scenario,capability,metric,value") {
+		t.Error("missing CSV header in output")
+	}
+}
+
+// errorCloser wraps a writer and returns an error on Close.
+type errorCloser struct {
+	io.Writer
+}
+
+func (e *errorCloser) Close() error {
+	return errors.New("close error")
+}
+
+func TestToCSVCloseError(t *testing.T) {
+	orig := osCreateFile
+	defer func() { osCreateFile = orig }()
+
+	osCreateFile = func(name string) (io.WriteCloser, error) {
+		return &errorCloser{Writer: &bytes.Buffer{}}, nil
+	}
+
+	err := ToCSV([]Scenario{testScenario()}, "anything.csv")
+	if err == nil {
+		t.Error("expected error from close")
+	}
+	if err.Error() != "close error" {
+		t.Errorf("expected close error, got: %v", err)
+	}
+}
+
+func TestToCSVCreateError(t *testing.T) {
+	orig := osCreateFile
+	defer func() { osCreateFile = orig }()
+
+	osCreateFile = func(name string) (io.WriteCloser, error) {
+		return nil, errors.New("create error")
+	}
+
+	err := ToCSV([]Scenario{testScenario()}, "anything.csv")
+	if err == nil {
+		t.Error("expected error from create")
+	}
+	if !strings.Contains(err.Error(), "creating csv file") {
+		t.Errorf("expected wrapped create error, got: %v", err)
 	}
 }

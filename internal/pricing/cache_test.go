@@ -1,6 +1,7 @@
 package pricing
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -165,6 +166,36 @@ func TestCacheLoadRejectsZeroRates(t *testing.T) {
 	}
 }
 
+func TestNewCache(t *testing.T) {
+	c := NewCache()
+	if c == nil {
+		t.Fatal("NewCache returned nil")
+	}
+	if c.dir == "" {
+		t.Error("NewCache dir should not be empty")
+	}
+	if c.now == nil {
+		t.Error("NewCache now func should not be nil")
+	}
+}
+
+func TestCacheSaveMkdirError(t *testing.T) {
+	tmp := t.TempDir()
+	blockingFile := filepath.Join(tmp, "blocker")
+	if err := os.WriteFile(blockingFile, []byte("x"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	c := &Cache{
+		dir: filepath.Join(blockingFile, "subdir"),
+		now: time.Now,
+	}
+
+	if err := c.Save("us-east-1", DefaultRates()); err == nil {
+		t.Error("expected error when cache dir is under a file")
+	}
+}
+
 func TestCacheSaveOverwrites(t *testing.T) {
 	c := newTestCache(t)
 
@@ -181,5 +212,23 @@ func TestCacheSaveOverwrites(t *testing.T) {
 	loaded := c.Load("us-east-1")
 	if loaded == nil || loaded.ArgoCDBasePerHour != 0.05 {
 		t.Errorf("expected updated rate 0.05, got %+v", loaded)
+	}
+}
+
+func TestCacheSaveJsonMarshalError(t *testing.T) {
+	orig := cacheJSONMarshal
+	defer func() { cacheJSONMarshal = orig }()
+
+	cacheJSONMarshal = func(v any) ([]byte, error) {
+		return nil, fmt.Errorf("marshal error")
+	}
+
+	c := newTestCache(t)
+	err := c.Save("us-east-1", DefaultRates())
+	if err == nil {
+		t.Error("expected error from json marshal")
+	}
+	if err.Error() != "marshal error" {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

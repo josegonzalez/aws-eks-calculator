@@ -3,10 +3,16 @@ package export
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
 	"os"
 
 	"github.com/josegonzalez/aws-eks-calculator/internal/calculator"
 )
+
+// osCreateFile abstracts os.Create for testing. Returns an io.WriteCloser.
+var osCreateFile = func(name string) (io.WriteCloser, error) {
+	return os.Create(name)
+}
 
 // Scenario pairs an input with its calculated breakdown.
 type Scenario struct {
@@ -15,16 +21,25 @@ type Scenario struct {
 }
 
 // ToCSV writes the scenarios to a CSV file at the given path.
-func ToCSV(scenarios []Scenario, path string) error {
-	f, err := os.Create(path)
+func ToCSV(scenarios []Scenario, path string) (retErr error) {
+	f, err := osCreateFile(path)
 	if err != nil {
 		return fmt.Errorf("creating csv file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if cErr := f.Close(); cErr != nil && retErr == nil {
+			retErr = cErr
+		}
+	}()
 
-	w := csv.NewWriter(f)
+	return writeCSV(f, scenarios)
+}
 
-	w.Write([]string{"scenario", "capability", "metric", "value"})
+func writeCSV(w io.Writer, scenarios []Scenario) error {
+	cw := csv.NewWriter(w)
+
+	// csv.Writer buffers writes internally; errors surface via Flush/Error.
+	cw.Write([]string{"scenario", "capability", "metric", "value"}) //nolint:errcheck // errors checked via cw.Error()
 
 	for _, s := range scenarios {
 		cap := s.Input.Capability.String()
@@ -42,10 +57,10 @@ func ToCSV(scenarios []Scenario, path string) error {
 			{s.Input.Name, cap, "difference_monthly", fmt.Sprintf("%.2f", s.Breakdown.ManagedVsSelfManaged)},
 		}
 		for _, row := range rows {
-			w.Write(row)
+			cw.Write(row) //nolint:errcheck // errors checked via cw.Error()
 		}
 	}
 
-	w.Flush()
-	return w.Error()
+	cw.Flush()
+	return cw.Error()
 }

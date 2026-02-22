@@ -9,6 +9,8 @@ import (
 const configSubdir = "aws-eks-calculator"
 const configFile = "prefs.json"
 
+var jsonMarshal = json.Marshal
+
 // Prefs holds user preferences that persist across sessions.
 type Prefs struct {
 	Region string `json:"region,omitempty"`
@@ -62,7 +64,7 @@ func (s *store) save(p Prefs) error {
 		return err
 	}
 
-	data, err := json.Marshal(p)
+	data, err := jsonMarshal(p)
 	if err != nil {
 		return err
 	}

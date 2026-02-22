@@ -1,4 +1,6 @@
-aws-eks-calculator
 .DS_Store
 *.csv
+aws-eks-calculator
+coverage.html
+coverage.out
 dist/
