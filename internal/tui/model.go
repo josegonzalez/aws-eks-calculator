@@ -18,18 +18,18 @@ import (
 	"github.com/josegonzalez/aws-eks-calculator/internal/tui/views"
 )
 
-// ViewState represents the current view in the TUI.
-type ViewState int
+// viewState represents the current view in the TUI.
+type viewState int
 
 const (
-	ViewCapabilitySelector ViewState = iota
-	ViewCalculator
-	ViewHelp
-	ViewRegions
+	viewCapabilitySelector viewState = iota
+	viewCalculator
+	viewHelp
+	viewRegions
 )
 
-// AllRegions is the list of AWS regions available in the region picker.
-var AllRegions = []string{
+// allRegions is the list of AWS regions available in the region picker.
+var allRegions = []string{
 	"us-east-1", "us-east-2", "us-west-1", "us-west-2",
 	"eu-west-1", "eu-west-2", "eu-west-3", "eu-central-1", "eu-central-2", "eu-north-1", "eu-south-1", "eu-south-2",
 	"ap-southeast-1", "ap-southeast-2", "ap-northeast-1", "ap-northeast-2", "ap-northeast-3", "ap-south-1", "ap-east-1",
@@ -48,8 +48,8 @@ type pricingMsg struct {
 // cacheWarmMsg is sent when background cache warming completes.
 type cacheWarmMsg struct{}
 
-// CapabilityState holds per-capability TUI state.
-type CapabilityState struct {
+// capabilityState holds per-capability TUI state.
+type capabilityState struct {
 	Inputs     []textinput.Model
 	FocusIndex int
 	Breakdown  calculator.CostBreakdown
@@ -59,12 +59,11 @@ type CapabilityState struct {
 type Model struct {
 	width  int
 	height int
-	view   ViewState
-	keys   KeyMap
+	view viewState
 
 	// Per-capability state
 	activeCapability calculator.Capability
-	capStates        map[calculator.Capability]*CapabilityState
+	capStates        map[calculator.Capability]*capabilityState
 
 	// Capability selector
 	capSelectorCursor int
@@ -90,25 +89,24 @@ type Model struct {
 
 // NewModel creates a new TUI model with default values.
 func NewModel() Model {
-	capStates := make(map[calculator.Capability]*CapabilityState)
+	capStates := make(map[calculator.Capability]*capabilityState)
 	for _, cap := range calculator.AllCapabilities {
 		capStates[cap] = newCapabilityState(cap)
 	}
 
 	region := "us-east-1"
-	if p := prefs.Load(); p.Region != "" && containsRegion(AllRegions, p.Region) {
+	if p := prefs.Load(); p.Region != "" && containsRegion(allRegions, p.Region) {
 		region = p.Region
 	}
 
 	m := Model{
-		keys:             DefaultKeyMap(),
 		activeCapability: calculator.CapabilityArgoCD,
 		capStates:        capStates,
-		allRegions:       AllRegions,
+		allRegions:       allRegions,
 		rates:            pricing.DefaultRates(),
 		ratesLoading:     true,
 		pricingRegion:    region,
-		view:             ViewCapabilitySelector,
+		view:             viewCapabilitySelector,
 	}
 
 	m.applyLiveRates()
@@ -126,7 +124,7 @@ func containsRegion(regions []string, region string) bool {
 	return false
 }
 
-func newCapabilityState(cap calculator.Capability) *CapabilityState {
+func newCapabilityState(cap calculator.Capability) *capabilityState {
 	defaults := calculator.DefaultInput(cap)
 	fields := views.InputFieldsForCapability(cap)
 	n := len(fields)
@@ -167,7 +165,7 @@ func newCapabilityState(cap calculator.Capability) *CapabilityState {
 	inputs[0].Focus()
 	inputs[0].TextStyle = styles.FocusedInputStyle
 
-	return &CapabilityState{
+	return &capabilityState{
 		Inputs: inputs,
 	}
 }
@@ -219,8 +217,8 @@ func warmCacheCmd(regions []string, skip string) tea.Cmd {
 	}
 }
 
-// activeState returns the CapabilityState for the currently active capability.
-func (m *Model) activeState() *CapabilityState {
+// activeState returns the capabilityState for the currently active capability.
+func (m *Model) activeState() *capabilityState {
 	return m.capStates[m.activeCapability]
 }
 
@@ -261,7 +259,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	// Update focused text input
-	if m.view == ViewCalculator {
+	if m.view == viewCalculator {
 		cs := m.activeState()
 		if cs.FocusIndex < len(cs.Inputs) {
 			var cmd tea.Cmd
@@ -276,13 +274,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleKeyPress(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch m.view {
-	case ViewCapabilitySelector:
+	case viewCapabilitySelector:
 		return m.handleSelectorKeys(msg)
-	case ViewCalculator:
+	case viewCalculator:
 		return m.handleCalculatorKeys(msg)
-	case ViewHelp:
+	case viewHelp:
 		return m.handleHelpKeys(msg)
-	case ViewRegions:
+	case viewRegions:
 		return m.handleRegionKeys(msg)
 	}
 	return m, nil
@@ -308,7 +306,7 @@ func (m Model) handleSelectorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		m.activeCapability = calculator.AllCapabilities[m.capSelectorCursor]
-		m.view = ViewCalculator
+		m.view = viewCalculator
 		m.recalculate()
 		return m, nil
 	}
@@ -356,7 +354,7 @@ func (m Model) handleCalculatorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "r":
-		m.view = ViewRegions
+		m.view = viewRegions
 		m.regionCursor = 0
 		return m, nil
 
@@ -364,7 +362,7 @@ func (m Model) handleCalculatorKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.doExport()
 
 	case "?":
-		m.view = ViewHelp
+		m.view = viewHelp
 		return m, nil
 	}
 
@@ -392,7 +390,7 @@ func capabilityIndex(cap calculator.Capability) int {
 func (m Model) handleRegionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
-		m.view = ViewCalculator
+		m.view = viewCalculator
 		return m, nil
 	case "up", "k":
 		if m.regionCursor > 0 {
@@ -406,7 +404,7 @@ func (m Model) handleRegionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "enter":
 		selected := m.allRegions[m.regionCursor]
-		m.view = ViewCalculator
+		m.view = viewCalculator
 		if selected != m.pricingRegion {
 			m.pricingRegion = selected
 			m.ratesLoading = true
@@ -421,7 +419,7 @@ func (m Model) handleRegionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleHelpKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "?", "q":
-		m.view = ViewCalculator
+		m.view = viewCalculator
 		return m, nil
 	case "ctrl+c":
 		m.quitting = true
@@ -538,10 +536,10 @@ func (m Model) View() string {
 		b.WriteString(styles.MutedStyle.Render(fmt.Sprintf("Loading rates for %s...", m.pricingRegion)))
 	} else {
 		switch m.view {
-		case ViewCapabilitySelector:
+		case viewCapabilitySelector:
 			b.WriteString(views.RenderCapabilitySelector(m.capSelectorCursor))
 
-		case ViewCalculator:
+		case viewCalculator:
 			cs := m.activeState()
 			input := m.buildInput()
 
@@ -555,22 +553,22 @@ func (m Model) View() string {
 				b.WriteString(styles.MutedStyle.Render(hints[cs.FocusIndex]))
 				b.WriteString("\n")
 			}
-		case ViewHelp:
+		case viewHelp:
 			b.WriteString(views.RenderHelp())
 
-		case ViewRegions:
+		case viewRegions:
 			b.WriteString(views.RenderRegions(m.allRegions, m.regionCursor))
 		}
 
 		var hint string
 		switch m.view {
-		case ViewCapabilitySelector:
+		case viewCapabilitySelector:
 			hint = "↑/↓ navigate  enter select  q quit"
-		case ViewCalculator:
+		case viewCalculator:
 			hint = "↑/↓/tab navigate  [/] capability  r region  e export  ? help  q quit"
-		case ViewHelp:
+		case viewHelp:
 			hint = "esc back  q quit"
-		case ViewRegions:
+		case viewRegions:
 			hint = "↑/↓ navigate  enter select  esc cancel"
 		}
 		if hint != "" {

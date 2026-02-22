@@ -6,38 +6,37 @@ import (
 
 var (
 	// Colors — blue/cyan theme for a cloud cost calculator feel.
-	PrimaryColor   = lipgloss.Color("#3B82F6")
-	SecondaryColor = lipgloss.Color("#60A5FA")
-	AccentColor    = lipgloss.Color("#06B6D4")
-	SuccessColor   = lipgloss.Color("#10B981")
-	WarningColor   = lipgloss.Color("#F59E0B")
-	ErrorColor     = lipgloss.Color("#EF4444")
-	MutedColor     = lipgloss.Color("#6B7280")
-	TextColor      = lipgloss.Color("#E5E7EB")
-	DimColor       = lipgloss.Color("#9CA3AF")
+	primaryColor   = lipgloss.Color("#3B82F6")
+	accentColor    = lipgloss.Color("#06B6D4")
+	successColor   = lipgloss.Color("#10B981")
+	warningColor   = lipgloss.Color("#F59E0B")
+	errorColor     = lipgloss.Color("#EF4444")
+	mutedColor     = lipgloss.Color("#6B7280")
+	textColor      = lipgloss.Color("#E5E7EB")
+	dimColor       = lipgloss.Color("#9CA3AF")
 
 	// Styles
 	TitleStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(PrimaryColor).
+			Foreground(primaryColor).
 			MarginBottom(1)
 
 	SectionStyle = lipgloss.NewStyle().
 			Bold(true).
-			Foreground(AccentColor)
+			Foreground(accentColor)
 
 	SubSectionStyle = lipgloss.NewStyle().
-				Foreground(AccentColor)
+				Foreground(accentColor)
 
 	LabelStyle = lipgloss.NewStyle().
-			Foreground(DimColor)
+			Foreground(dimColor)
 
 	ValueStyle = lipgloss.NewStyle().
-			Foreground(TextColor).
+			Foreground(textColor).
 			Bold(true)
 
 	MoneyStyle = lipgloss.NewStyle().
-			Foreground(TextColor).
+			Foreground(textColor).
 			Bold(true)
 
 	BigMoneyStyle = lipgloss.NewStyle().
@@ -45,51 +44,51 @@ var (
 			Bold(true)
 
 	SuccessStyle = lipgloss.NewStyle().
-			Foreground(SuccessColor).
+			Foreground(successColor).
 			Bold(true)
 
 	ErrorStyle = lipgloss.NewStyle().
-			Foreground(ErrorColor).
+			Foreground(errorColor).
 			Bold(true)
 
 	WarningStyle = lipgloss.NewStyle().
-			Foreground(WarningColor)
+			Foreground(warningColor)
 
 	MutedStyle = lipgloss.NewStyle().
-			Foreground(MutedColor)
+			Foreground(mutedColor)
 
 	HelpStyle = lipgloss.NewStyle().
-			Foreground(MutedColor)
+			Foreground(mutedColor)
 
 	FocusedInputStyle = lipgloss.NewStyle().
-				Foreground(PrimaryColor).
+				Foreground(primaryColor).
 				Bold(true)
 
 	BlurredInputStyle = lipgloss.NewStyle().
-				Foreground(DimColor)
+				Foreground(dimColor)
 
 	SelectedPresetStyle = lipgloss.NewStyle().
 				Foreground(lipgloss.Color("#FFFFFF")).
-				Background(PrimaryColor).
+				Background(primaryColor).
 				Bold(true).
 				Padding(0, 1)
 
 	NormalPresetStyle = lipgloss.NewStyle().
-				Foreground(TextColor).
+				Foreground(textColor).
 				Padding(0, 1)
 
 	BoxStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(PrimaryColor).
+			BorderForeground(primaryColor).
 			Padding(1, 2)
 
 	ActiveTabStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(lipgloss.Color("#FFFFFF")).
-			Background(PrimaryColor).
+			Background(primaryColor).
 			Padding(0, 1)
 
 	InactiveTabStyle = lipgloss.NewStyle().
-				Foreground(DimColor).
+				Foreground(dimColor).
 				Padding(0, 1)
 )

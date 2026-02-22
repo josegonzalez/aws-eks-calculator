@@ -4,7 +4,6 @@ import (
 	"encoding/csv"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/josegonzalez/aws-eks-calculator/internal/calculator"
 )
@@ -49,29 +48,4 @@ func ToCSV(scenarios []Scenario, path string) error {
 
 	w.Flush()
 	return w.Error()
-}
-
-// ToText returns a formatted text summary of the scenarios.
-func ToText(scenarios []Scenario) string {
-	var b strings.Builder
-
-	b.WriteString("AWS EKS Capabilities Cost Estimate\n")
-	b.WriteString(strings.Repeat("=", 40) + "\n\n")
-
-	for _, s := range scenarios {
-		fmt.Fprintf(&b, "Scenario: %s (%s)\n", s.Input.Name, s.Input.Capability.String())
-		b.WriteString(strings.Repeat("-", 40) + "\n")
-		fmt.Fprintf(&b, "  Clusters:         %d\n", s.Input.NumClusters)
-		fmt.Fprintf(&b, "  Resources/cluster: %d\n", s.Input.ResourcesPerCluster)
-		fmt.Fprintf(&b, "  Total resources:  %d\n", s.Breakdown.TotalResources)
-		fmt.Fprintf(&b, "  Hours/month:      %.0f\n\n", s.Input.HoursPerMonth)
-		fmt.Fprintf(&b, "  Base capability:  $%.2f/mo\n", s.Breakdown.BaseCapabilityMonthly)
-		fmt.Fprintf(&b, "  Per-resource:     $%.2f/mo\n", s.Breakdown.PerResourceMonthly)
-		fmt.Fprintf(&b, "  Monthly total:    $%.2f\n", s.Breakdown.TotalMonthly)
-		fmt.Fprintf(&b, "  Annual total:     $%.2f\n\n", s.Breakdown.TotalAnnual)
-		fmt.Fprintf(&b, "  Self-managed:     $%.2f/mo\n", s.Breakdown.SelfManagedTotalMonthly)
-		fmt.Fprintf(&b, "  Difference:       $%.2f/mo\n\n", s.Breakdown.ManagedVsSelfManaged)
-	}
-
-	return b.String()
 }

@@ -21,12 +21,6 @@ func Run() error {
 	return RunWithIO(nil, nil)
 }
 
-// RunWithOutput starts the TUI with a custom output writer.
-// Pass nil for default (stdout with alt screen).
-func RunWithOutput(out io.Writer) error {
-	return RunWithIO(nil, out)
-}
-
 // RunWithIO starts the TUI with custom input and output.
 // Pass nil for defaults (stdin/stdout with alt screen).
 func RunWithIO(in io.Reader, out io.Writer) error {

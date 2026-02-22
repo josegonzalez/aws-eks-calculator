@@ -20,27 +20,10 @@ func TestDefaultKeyMap(t *testing.T) {
 	if len(km.NextTab.Keys()) == 0 {
 		t.Error("NextTab has no keys")
 	}
-}
-
-func TestShortHelp(t *testing.T) {
-	km := DefaultKeyMap()
-	bindings := km.ShortHelp()
-
-	if len(bindings) == 0 {
-		t.Error("ShortHelp returned empty")
+	if len(km.Export.Keys()) == 0 {
+		t.Error("Export has no keys")
 	}
-}
-
-func TestFullHelp(t *testing.T) {
-	km := DefaultKeyMap()
-	groups := km.FullHelp()
-
-	if len(groups) == 0 {
-		t.Error("FullHelp returned empty")
-	}
-	for i, group := range groups {
-		if len(group) == 0 {
-			t.Errorf("FullHelp group %d is empty", i)
-		}
+	if len(km.Help.Keys()) == 0 {
+		t.Error("Help has no keys")
 	}
 }

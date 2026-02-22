@@ -92,46 +92,6 @@ func TestToCSVInvalidPath(t *testing.T) {
 	}
 }
 
-func TestToText(t *testing.T) {
-	scenarios := []Scenario{testScenario()}
-	text := ToText(scenarios)
-
-	if !strings.Contains(text, "AWS EKS Capabilities Cost Estimate") {
-		t.Error("missing header")
-	}
-	if !strings.Contains(text, "Scenario: Test (ArgoCD)") {
-		t.Error("missing scenario name with capability")
-	}
-	if !strings.Contains(text, "Clusters:         1") {
-		t.Error("missing clusters")
-	}
-	if !strings.Contains(text, "Resources/cluster: 5") {
-		t.Error("missing resources/cluster")
-	}
-	if !strings.Contains(text, "Total resources:  5") {
-		t.Error("missing total resources")
-	}
-	if !strings.Contains(text, "Base capability:") {
-		t.Error("missing base capability")
-	}
-	if !strings.Contains(text, "Monthly total:") {
-		t.Error("missing monthly total")
-	}
-	if !strings.Contains(text, "Self-managed:") {
-		t.Error("missing self-managed")
-	}
-	if !strings.Contains(text, "Difference:") {
-		t.Error("missing difference")
-	}
-}
-
-func TestToTextEmpty(t *testing.T) {
-	text := ToText(nil)
-	if !strings.Contains(text, "AWS EKS Capabilities Cost Estimate") {
-		t.Error("missing header even for empty list")
-	}
-}
-
 func TestToCSVACK(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "ack.csv")
