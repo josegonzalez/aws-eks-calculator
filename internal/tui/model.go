@@ -210,7 +210,7 @@ func warmCacheCmd(regions []string, skip string) tea.Cmd {
 				continue
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			pricing.FetchRates(ctx, region)
+			_, _ = pricing.FetchRates(ctx, region)
 			cancel()
 		}
 		return cacheWarmMsg{}

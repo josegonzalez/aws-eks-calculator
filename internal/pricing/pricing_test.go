@@ -417,7 +417,7 @@ func (m *paginatedMockPricingAPI) GetProducts(ctx context.Context, params *prici
 
 	pageIdx := 0
 	if params.NextToken != nil {
-		fmt.Sscanf(*params.NextToken, "%d", &pageIdx)
+		_, _ = fmt.Sscanf(*params.NextToken, "%d", &pageIdx)
 	}
 
 	if pageIdx >= len(m.pages) {

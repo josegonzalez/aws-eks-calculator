@@ -15,16 +15,22 @@ type Scenario struct {
 }
 
 // ToCSV writes the scenarios to a CSV file at the given path.
-func ToCSV(scenarios []Scenario, path string) error {
+func ToCSV(scenarios []Scenario, path string) (retErr error) {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("creating csv file: %w", err)
 	}
-	defer f.Close()
+	defer func() {
+		if cErr := f.Close(); cErr != nil && retErr == nil {
+			retErr = cErr
+		}
+	}()
 
 	w := csv.NewWriter(f)
 
-	w.Write([]string{"scenario", "capability", "metric", "value"})
+	if err := w.Write([]string{"scenario", "capability", "metric", "value"}); err != nil {
+		return err
+	}
 
 	for _, s := range scenarios {
 		cap := s.Input.Capability.String()
@@ -42,7 +48,9 @@ func ToCSV(scenarios []Scenario, path string) error {
 			{s.Input.Name, cap, "difference_monthly", fmt.Sprintf("%.2f", s.Breakdown.ManagedVsSelfManaged)},
 		}
 		for _, row := range rows {
-			w.Write(row)
+			if err := w.Write(row); err != nil {
+				return err
+			}
 		}
 	}
 

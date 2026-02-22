@@ -249,7 +249,7 @@ func fetchFargate(ctx context.Context, client PricingAPI, region string) (vcpuRa
 
 	vcpuRate, err = fetchSingleRate(ctx, client, vcpuInput)
 	if err != nil {
-		return 0, 0, fmt.Errorf("Fargate vCPU: %w", err)
+		return 0, 0, fmt.Errorf("fargate vCPU: %w", err)
 	}
 
 	memInput := &pricing.GetProductsInput{
@@ -276,7 +276,7 @@ func fetchFargate(ctx context.Context, client PricingAPI, region string) (vcpuRa
 
 	memRate, err = fetchSingleRate(ctx, client, memInput)
 	if err != nil {
-		return 0, 0, fmt.Errorf("Fargate memory: %w", err)
+		return 0, 0, fmt.Errorf("fargate memory: %w", err)
 	}
 
 	return vcpuRate, memRate, nil
