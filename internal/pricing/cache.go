@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-// CacheTTL is how long cached rates remain valid.
-const CacheTTL = 24 * time.Hour
+// cacheTTL is how long cached rates remain valid.
+const cacheTTL = 24 * time.Hour
 
 const cacheSubdir = "aws-eks-calculator"
 
@@ -50,7 +50,7 @@ func (c *Cache) Load(region string) *Rates {
 		return nil
 	}
 
-	if c.now().Sub(entry.FetchedAt) > CacheTTL {
+	if c.now().Sub(entry.FetchedAt) > cacheTTL {
 		return nil
 	}
 

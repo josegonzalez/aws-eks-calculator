@@ -19,7 +19,7 @@ import (
 func newReadyModel() Model {
 	m := NewModel()
 	m.ratesLoading = false
-	m.view = ViewCalculator
+	m.view = viewCalculator
 	return m
 }
 
@@ -45,8 +45,8 @@ func TestNewModel(t *testing.T) {
 		t.Errorf("kro: expected 7 inputs, got %d", len(kroState.Inputs))
 	}
 
-	if m.view != ViewCapabilitySelector {
-		t.Errorf("expected ViewCapabilitySelector, got %d", m.view)
+	if m.view != viewCapabilitySelector {
+		t.Errorf("expected viewCapabilitySelector, got %d", m.view)
 	}
 	if m.pricingRegion != "us-east-1" {
 		t.Errorf("expected default pricingRegion us-east-1, got %q", m.pricingRegion)
@@ -252,17 +252,17 @@ func TestUpdatePricingMsgPartialError(t *testing.T) {
 
 func TestUpdateFallthrough(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewHelp
+	m.view = viewHelp
 	updated, _ := m.Update(tea.MouseMsg{})
 	model := updated.(Model)
-	if model.view != ViewHelp {
+	if model.view != viewHelp {
 		t.Error("view should not change on unhandled msg")
 	}
 }
 
 func TestUpdateInputForwarding(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewCalculator
+	m.view = viewCalculator
 	updated, _ := m.Update(tea.MouseMsg{})
 	_ = updated.(Model) // should not panic
 }
@@ -324,8 +324,8 @@ func TestSelectorEnter(t *testing.T) {
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 
-	if model.view != ViewCalculator {
-		t.Error("enter should switch to ViewCalculator")
+	if model.view != viewCalculator {
+		t.Error("enter should switch to viewCalculator")
 	}
 	if model.activeCapability != calculator.CapabilityACK {
 		t.Errorf("expected ACK, got %v", model.activeCapability)
@@ -366,7 +366,7 @@ func TestSelectorUnhandled(t *testing.T) {
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	model := updated.(Model)
-	if model.view != ViewCapabilitySelector {
+	if model.view != viewCapabilitySelector {
 		t.Error("unhandled key should not change view")
 	}
 }
@@ -432,8 +432,8 @@ func TestCalculatorKeysRegions(t *testing.T) {
 	m := newReadyModel()
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}})
 	model := updated.(Model)
-	if model.view != ViewRegions {
-		t.Error("r should switch to ViewRegions")
+	if model.view != viewRegions {
+		t.Error("r should switch to viewRegions")
 	}
 	if model.regionCursor != 0 {
 		t.Errorf("region cursor should be 0, got %d", model.regionCursor)
@@ -444,8 +444,8 @@ func TestCalculatorKeysHelp(t *testing.T) {
 	m := newReadyModel()
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	model := updated.(Model)
-	if model.view != ViewHelp {
-		t.Error("? should switch to ViewHelp")
+	if model.view != viewHelp {
+		t.Error("? should switch to viewHelp")
 	}
 }
 
@@ -559,7 +559,7 @@ func TestCalculatorInputsPersistAcrossTabs(t *testing.T) {
 
 func TestRegionPickerNavigation(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
 	model := updated.(Model)
@@ -594,7 +594,7 @@ func TestRegionPickerNavigation(t *testing.T) {
 
 func TestRegionPickerDownAtBottom(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 	m.regionCursor = len(m.allRegions) - 1
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyDown})
@@ -606,20 +606,20 @@ func TestRegionPickerDownAtBottom(t *testing.T) {
 
 func TestRegionPickerEsc(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
-	if model.view != ViewCalculator {
+	if model.view != viewCalculator {
 		t.Error("esc should close region picker")
 	}
 }
 
 func TestRegionPickerQ(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	model := updated.(Model)
-	if model.view != ViewCalculator {
+	if model.view != viewCalculator {
 		t.Error("q should close region picker")
 	}
 }
@@ -629,13 +629,13 @@ func TestRegionPickerSelectDifferentRegion(t *testing.T) {
 	defer prefs.SetDir("")
 
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 	m.regionCursor = 1
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 
-	if model.view != ViewCalculator {
+	if model.view != viewCalculator {
 		t.Error("enter should return to calculator")
 	}
 	if model.pricingRegion != "us-east-2" {
@@ -655,13 +655,13 @@ func TestRegionPickerSelectSameRegion(t *testing.T) {
 	defer prefs.SetDir("")
 
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 	m.regionCursor = 0
 
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
 	model := updated.(Model)
 
-	if model.view != ViewCalculator {
+	if model.view != viewCalculator {
 		t.Error("enter should return to calculator")
 	}
 	if model.pricingRegion != "us-east-1" {
@@ -674,10 +674,10 @@ func TestRegionPickerSelectSameRegion(t *testing.T) {
 
 func TestRegionPickerUnhandled(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	model := updated.(Model)
-	if model.view != ViewRegions {
+	if model.view != viewRegions {
 		t.Error("unhandled key should not change view")
 	}
 }
@@ -686,37 +686,37 @@ func TestRegionPickerUnhandled(t *testing.T) {
 
 func TestHelpKeysEsc(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewHelp
+	m.view = viewHelp
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEsc})
 	model := updated.(Model)
-	if model.view != ViewCalculator {
+	if model.view != viewCalculator {
 		t.Error("esc should close help")
 	}
 }
 
 func TestHelpKeysQuestion(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewHelp
+	m.view = viewHelp
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	model := updated.(Model)
-	if model.view != ViewCalculator {
+	if model.view != viewCalculator {
 		t.Error("? should close help")
 	}
 }
 
 func TestHelpKeysQ(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewHelp
+	m.view = viewHelp
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	model := updated.(Model)
-	if model.view != ViewCalculator {
+	if model.view != viewCalculator {
 		t.Error("q should close help")
 	}
 }
 
 func TestHelpKeysCtrlC(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewHelp
+	m.view = viewHelp
 	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyCtrlC})
 	model := updated.(Model)
 	if !model.quitting {
@@ -729,10 +729,10 @@ func TestHelpKeysCtrlC(t *testing.T) {
 
 func TestHelpKeysUnhandled(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewHelp
+	m.view = viewHelp
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
 	model := updated.(Model)
-	if model.view != ViewHelp {
+	if model.view != viewHelp {
 		t.Error("unhandled key should not change view")
 	}
 }
@@ -771,7 +771,7 @@ func TestViewCapabilitySelector(t *testing.T) {
 
 func TestViewHelp(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewHelp
+	m.view = viewHelp
 	output := m.View()
 
 	if !strings.Contains(output, "Keyboard Shortcuts") {
@@ -784,7 +784,7 @@ func TestViewHelp(t *testing.T) {
 
 func TestViewRegions(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 	output := m.View()
 
 	if !strings.Contains(output, "Select Region") {
@@ -938,7 +938,7 @@ func TestClearExportTick(t *testing.T) {
 
 func TestHandleKeyPressUnknownView(t *testing.T) {
 	m := newReadyModel()
-	m.view = ViewState(99) // unknown view
+	m.view = viewState(99) // unknown view
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
 	_ = updated.(Model) // should not panic
 }
@@ -1025,7 +1025,7 @@ func TestViewLoadingAfterRegionChange(t *testing.T) {
 	defer prefs.SetDir("")
 
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 	m.regionCursor = 1 // us-east-2
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -1143,7 +1143,7 @@ func TestRegionPickerSavesPreference(t *testing.T) {
 	defer prefs.SetDir("")
 
 	m := newReadyModel()
-	m.view = ViewRegions
+	m.view = viewRegions
 	m.regionCursor = 1 // us-east-2
 
 	updated, _ := m.Update(tea.KeyMsg{Type: tea.KeyEnter})
@@ -1169,7 +1169,7 @@ func TestRegionPickerSameRegionDoesNotSave(t *testing.T) {
 
 	m := newReadyModel()
 	// Model loads eu-west-1 from prefs. Select the same region (index 4).
-	m.view = ViewRegions
+	m.view = viewRegions
 	m.regionCursor = 4 // eu-west-1
 
 	m.Update(tea.KeyMsg{Type: tea.KeyEnter})

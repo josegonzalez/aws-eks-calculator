@@ -70,10 +70,3 @@ func TestRun(t *testing.T) {
 	}
 }
 
-func TestRunWithOutput(t *testing.T) {
-	defer withMockProgram(nil)()
-	err := RunWithOutput(io.Discard)
-	if err != nil {
-		t.Errorf("unexpected error: %v", err)
-	}
-}

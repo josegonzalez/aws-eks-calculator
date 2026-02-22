@@ -216,25 +216,25 @@ func TestInputFieldsForCapability(t *testing.T) {
 }
 
 func TestResourceLabel(t *testing.T) {
-	if ResourceLabel(calculator.CapabilityArgoCD) != "Per-application" {
+	if resourceLabel(calculator.CapabilityArgoCD) != "Per-application" {
 		t.Error("wrong ArgoCD label")
 	}
-	if ResourceLabel(calculator.CapabilityACK) != "Per-resource" {
+	if resourceLabel(calculator.CapabilityACK) != "Per-resource" {
 		t.Error("wrong ACK label")
 	}
-	if ResourceLabel(calculator.CapabilityKro) != "Per-RGD" {
+	if resourceLabel(calculator.CapabilityKro) != "Per-RGD" {
 		t.Error("wrong kro label")
 	}
 }
 
 func TestTotalResourcesLabel(t *testing.T) {
-	if TotalResourcesLabel(calculator.CapabilityArgoCD) != "Total apps:" {
+	if totalResourcesLabel(calculator.CapabilityArgoCD) != "Total apps:" {
 		t.Error("wrong ArgoCD total label")
 	}
-	if TotalResourcesLabel(calculator.CapabilityACK) != "Total resources:" {
+	if totalResourcesLabel(calculator.CapabilityACK) != "Total resources:" {
 		t.Error("wrong ACK total label")
 	}
-	if TotalResourcesLabel(calculator.CapabilityKro) != "Total RGDs:" {
+	if totalResourcesLabel(calculator.CapabilityKro) != "Total RGDs:" {
 		t.Error("wrong kro total label")
 	}
 }

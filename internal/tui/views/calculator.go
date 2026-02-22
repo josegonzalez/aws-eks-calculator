@@ -61,8 +61,8 @@ func InputFieldsForCapability(cap calculator.Capability) []InputField {
 	return base
 }
 
-// InputLabelsForCapability returns just the labels for a capability.
-func InputLabelsForCapability(cap calculator.Capability) []string {
+// inputLabelsForCapability returns just the labels for a capability.
+func inputLabelsForCapability(cap calculator.Capability) []string {
 	fields := InputFieldsForCapability(cap)
 	labels := make([]string, len(fields))
 	for i, f := range fields {
@@ -81,8 +81,8 @@ func InputHintsForCapability(cap calculator.Capability) []string {
 	return hints
 }
 
-// ResourceLabel returns the per-resource label for the given capability.
-func ResourceLabel(cap calculator.Capability) string {
+// resourceLabel returns the per-resource label for the given capability.
+func resourceLabel(cap calculator.Capability) string {
 	switch cap {
 	case calculator.CapabilityArgoCD:
 		return "Per-application"
@@ -95,8 +95,8 @@ func ResourceLabel(cap calculator.Capability) string {
 	}
 }
 
-// TotalResourcesLabel returns the total resources label for the given capability.
-func TotalResourcesLabel(cap calculator.Capability) string {
+// totalResourcesLabel returns the total resources label for the given capability.
+func totalResourcesLabel(cap calculator.Capability) string {
 	switch cap {
 	case calculator.CapabilityArgoCD:
 		return "Total apps:"
@@ -126,7 +126,7 @@ func RenderCalculator(cap calculator.Capability, inputs []textinput.Model, focus
 
 func renderInputPanel(cap calculator.Capability, inputs []textinput.Model, focusIndex int, breakdown calculator.CostBreakdown, width int, region string) string {
 	var b strings.Builder
-	labels := InputLabelsForCapability(cap)
+	labels := inputLabelsForCapability(cap)
 
 	b.WriteString(styles.SectionStyle.Render("EKS-MANAGED COSTS"))
 	b.WriteString("\n\n")
@@ -154,7 +154,7 @@ func renderInputPanel(cap calculator.Capability, inputs []textinput.Model, focus
 
 	// Total resources summary
 	fmt.Fprintf(&b, "  %s %s\n\n",
-		styles.LabelStyle.Render(TotalResourcesLabel(cap)),
+		styles.LabelStyle.Render(totalResourcesLabel(cap)),
 		styles.ValueStyle.Render(fmt.Sprintf("%d", breakdown.TotalResources)),
 	)
 
@@ -207,7 +207,7 @@ func renderBreakdownPanel(cap calculator.Capability, input calculator.ScenarioIn
 	)
 
 	// Per-resource
-	resLabel := ResourceLabel(cap)
+	resLabel := resourceLabel(cap)
 	fmt.Fprintf(&b, "  %s  %s\n",
 		styles.LabelStyle.Render(resLabel),
 		styles.MoneyStyle.Render(formatMoney(breakdown.PerResourceMonthly)+"/mo"),
