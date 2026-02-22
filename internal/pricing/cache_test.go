@@ -1,6 +1,7 @@
 package pricing
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -211,5 +212,23 @@ func TestCacheSaveOverwrites(t *testing.T) {
 	loaded := c.Load("us-east-1")
 	if loaded == nil || loaded.ArgoCDBasePerHour != 0.05 {
 		t.Errorf("expected updated rate 0.05, got %+v", loaded)
+	}
+}
+
+func TestCacheSaveJsonMarshalError(t *testing.T) {
+	orig := cacheJSONMarshal
+	defer func() { cacheJSONMarshal = orig }()
+
+	cacheJSONMarshal = func(v any) ([]byte, error) {
+		return nil, fmt.Errorf("marshal error")
+	}
+
+	c := newTestCache(t)
+	err := c.Save("us-east-1", DefaultRates())
+	if err == nil {
+		t.Error("expected error from json marshal")
+	}
+	if err.Error() != "marshal error" {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

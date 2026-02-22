@@ -70,3 +70,10 @@ func TestRun(t *testing.T) {
 	}
 }
 
+func TestCreateProgramDefault(t *testing.T) {
+	p := createProgram(NewModel(), tea.WithOutput(io.Discard))
+	if p == nil {
+		t.Error("createProgram should return a non-nil program")
+	}
+}
+

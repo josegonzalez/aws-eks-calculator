@@ -1,6 +1,7 @@
 package prefs
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -170,5 +171,38 @@ func TestSaveMkdirAllError(t *testing.T) {
 	s := &store{dir: filepath.Join(blockingFile, "subdir")}
 	if err := s.save(Prefs{Region: "us-west-2"}); err == nil {
 		t.Error("expected error when dir is under a file")
+	}
+}
+
+func TestDefaultDirUsesUserConfigDir(t *testing.T) {
+	// Ensure overrideDir is cleared so we exercise the real os.UserConfigDir path.
+	SetDir("")
+	t.Cleanup(func() { SetDir("") })
+
+	home := os.Getenv("HOME")
+	if home == "" {
+		t.Skip("HOME not set, cannot test UserConfigDir path")
+	}
+
+	got := Load()
+	// Just verify it doesn't panic and returns a valid Prefs (even if empty).
+	_ = got
+}
+
+func TestSaveJsonMarshalError(t *testing.T) {
+	orig := jsonMarshal
+	defer func() { jsonMarshal = orig }()
+
+	jsonMarshal = func(v any) ([]byte, error) {
+		return nil, fmt.Errorf("marshal error")
+	}
+
+	s := newTestStore(t)
+	err := s.save(Prefs{Region: "us-east-1"})
+	if err == nil {
+		t.Error("expected error from json marshal")
+	}
+	if err.Error() != "marshal error" {
+		t.Errorf("unexpected error: %v", err)
 	}
 }

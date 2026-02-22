@@ -1,8 +1,10 @@
 package tui
 
 import (
+	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1178,5 +1180,84 @@ func TestRegionPickerSameRegionDoesNotSave(t *testing.T) {
 	saved := prefs.Load()
 	if saved.Region != "eu-west-1" {
 		t.Errorf("expected prefs unchanged (eu-west-1), got %q", saved.Region)
+	}
+}
+
+func TestCapabilityIndexUnknown(t *testing.T) {
+	idx := capabilityIndex(calculator.Capability(99))
+	if idx != 0 {
+		t.Errorf("expected 0 for unknown capability, got %d", idx)
+	}
+}
+
+func TestFetchPricingCmdClosure(t *testing.T) {
+	m := NewModel()
+	m.priceFetcher = func(_ context.Context, region string) (pricing.Rates, error) {
+		return pricing.DefaultRates(), nil
+	}
+
+	cmd := m.fetchPricingCmd("us-east-1")
+	msg := cmd()
+
+	pm, ok := msg.(pricingMsg)
+	if !ok {
+		t.Fatalf("expected pricingMsg, got %T", msg)
+	}
+	if pm.err != nil {
+		t.Errorf("unexpected error: %v", pm.err)
+	}
+	if pm.rates.ArgoCDBasePerHour != pricing.DefaultRates().ArgoCDBasePerHour {
+		t.Errorf("unexpected rates: %+v", pm.rates)
+	}
+}
+
+func TestFetchPricingCmdClosureError(t *testing.T) {
+	m := NewModel()
+	expectedErr := errors.New("mock fetch error")
+	m.priceFetcher = func(_ context.Context, region string) (pricing.Rates, error) {
+		return pricing.DefaultRates(), expectedErr
+	}
+
+	cmd := m.fetchPricingCmd("us-east-1")
+	msg := cmd()
+
+	pm, ok := msg.(pricingMsg)
+	if !ok {
+		t.Fatalf("expected pricingMsg, got %T", msg)
+	}
+	if pm.err != expectedErr {
+		t.Errorf("expected error %v, got %v", expectedErr, pm.err)
+	}
+}
+
+func TestWarmCacheCmdClosure(t *testing.T) {
+	var mu sync.Mutex
+	var calledRegions []string
+
+	m := NewModel()
+	m.priceFetcher = func(_ context.Context, region string) (pricing.Rates, error) {
+		mu.Lock()
+		calledRegions = append(calledRegions, region)
+		mu.Unlock()
+		return pricing.DefaultRates(), nil
+	}
+
+	regions := []string{"us-east-1", "us-east-2", "eu-west-1"}
+	cmd := m.warmCacheCmd(regions, "us-east-1")
+	msg := cmd()
+
+	if _, ok := msg.(cacheWarmMsg); !ok {
+		t.Fatalf("expected cacheWarmMsg, got %T", msg)
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	for _, r := range calledRegions {
+		if r == "us-east-1" {
+			t.Error("skip region us-east-1 should not be called")
+		}
+	}
+	if len(calledRegions) != 2 {
+		t.Errorf("expected 2 regions called, got %d: %v", len(calledRegions), calledRegions)
 	}
 }

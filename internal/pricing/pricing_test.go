@@ -4,8 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math"
+	"os"
 	"testing"
+	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/pricing"
 
 	"github.com/josegonzalez/aws-eks-calculator/internal/calculator"
@@ -701,5 +705,139 @@ func TestFetchPartialCapabilityFailure(t *testing.T) {
 	}
 	if rates.KroBasePerHour != defaults.KroBasePerHour {
 		t.Errorf("KroBasePerHour should be default on failure")
+	}
+}
+
+func TestNewPricingClientDefault(t *testing.T) {
+	client := newPricingClient(aws.Config{})
+	if client == nil {
+		t.Error("newPricingClient should return a non-nil client")
+	}
+}
+
+func TestFetchRatesConfigError(t *testing.T) {
+	origLoad := loadDefaultConfig
+	defer func() { loadDefaultConfig = origLoad }()
+
+	loadDefaultConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, fmt.Errorf("no credentials")
+	}
+
+	rates, err := FetchRates(context.Background(), "config-error-test-region")
+	if err != nil {
+		t.Fatalf("FetchRates should not return error on config failure, got %v", err)
+	}
+	defaults := DefaultRates()
+	if rates != defaults {
+		t.Errorf("expected default rates, got %+v", rates)
+	}
+}
+
+func TestFetchRatesClientSuccess(t *testing.T) {
+	origLoad := loadDefaultConfig
+	origClient := newPricingClient
+	defer func() {
+		loadDefaultConfig = origLoad
+		newPricingClient = origClient
+	}()
+
+	region := fmt.Sprintf("client-success-%d", time.Now().UnixNano())
+	mock := &mockPricingAPI{responses: allCapabilityProducts(region)}
+
+	loadDefaultConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, nil
+	}
+	newPricingClient = func(cfg aws.Config) PricingAPI {
+		return mock
+	}
+
+	got, err := FetchRates(context.Background(), region)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ArgoCDBasePerHour != 0.03 {
+		t.Errorf("expected ArgoCD rate 0.03, got %f", got.ArgoCDBasePerHour)
+	}
+
+	// Clean up cached entry
+	c := NewCache()
+	_ = os.Remove(c.path(region))
+}
+
+func TestFetchRatesClientError(t *testing.T) {
+	origLoad := loadDefaultConfig
+	origClient := newPricingClient
+	defer func() {
+		loadDefaultConfig = origLoad
+		newPricingClient = origClient
+	}()
+
+	region := fmt.Sprintf("client-error-%d", time.Now().UnixNano())
+	loadDefaultConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, nil
+	}
+	newPricingClient = func(cfg aws.Config) PricingAPI {
+		return &mockPricingAPI{err: fmt.Errorf("access denied")}
+	}
+
+	got, err := FetchRates(context.Background(), region)
+	if err != nil {
+		t.Fatalf("FetchRates should not return error on client failure, got %v", err)
+	}
+	defaults := DefaultRates()
+	if got.ArgoCDBasePerHour != defaults.ArgoCDBasePerHour {
+		t.Errorf("expected default rates, got %+v", got)
+	}
+}
+
+func TestFetchRatesCacheHit(t *testing.T) {
+	c := NewCache()
+	rates := DefaultRates()
+	rates.ArgoCDBasePerHour = 0.42
+	if err := c.Save("ap-south-1", rates); err != nil {
+		t.Fatalf("cache save: %v", err)
+	}
+
+	got, err := FetchRates(context.Background(), "ap-south-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.ArgoCDBasePerHour != 0.42 {
+		t.Errorf("expected cached rate 0.42, got %f", got.ArgoCDBasePerHour)
+	}
+
+	// Clean up
+	_ = c.Save("ap-south-1", Rates{}) // overwrite with empty to not affect other tests
+}
+
+func TestFetchRatesCacheStale(t *testing.T) {
+	// Save rates with missing capability fields — HasAllCapabilityRates returns false
+	c := NewCache()
+	staleRates := Rates{
+		ArgoCDBasePerHour:   0.03,
+		ArgoCDAppPerHour:    0.0015,
+		FargateVCPUPerHour:  0.04048,
+		FargateMemGBPerHour: 0.004446,
+		// ACK and KRO fields are zero
+	}
+	if err := c.Save("stale-test-region", staleRates); err != nil {
+		t.Fatalf("cache save: %v", err)
+	}
+
+	// FetchRates should fall through to client since HasAllCapabilityRates is false.
+	// Since loadDefaultConfig will likely fail without AWS creds, we get defaults.
+	origLoad := loadDefaultConfig
+	defer func() { loadDefaultConfig = origLoad }()
+	loadDefaultConfig = func(ctx context.Context, optFns ...func(*config.LoadOptions) error) (aws.Config, error) {
+		return aws.Config{}, fmt.Errorf("no creds")
+	}
+
+	got, err := FetchRates(context.Background(), "stale-test-region")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defaults := DefaultRates()
+	if got != defaults {
+		t.Errorf("expected default rates on stale cache + config error, got %+v", got)
 	}
 }

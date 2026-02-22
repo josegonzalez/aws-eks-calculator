@@ -84,6 +84,9 @@ type Model struct {
 	exportDir string // directory for export files; empty means current dir
 	exportMsg string
 
+	// priceFetcher abstracts the pricing fetch for testing.
+	priceFetcher func(ctx context.Context, region string) (pricing.Rates, error)
+
 	quitting bool
 }
 
@@ -107,6 +110,7 @@ func NewModel() Model {
 		ratesLoading:     true,
 		pricingRegion:    region,
 		view:             viewCapabilitySelector,
+		priceFetcher:     pricing.FetchRates,
 	}
 
 	m.applyLiveRates()
@@ -188,29 +192,31 @@ func newFloatInput(value string) textinput.Model {
 
 // Init initializes the model.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(textinput.Blink, fetchPricingCmd(m.pricingRegion))
+	return tea.Batch(textinput.Blink, m.fetchPricingCmd(m.pricingRegion))
 }
 
-func fetchPricingCmd(region string) tea.Cmd {
+func (m Model) fetchPricingCmd(region string) tea.Cmd {
+	fetcher := m.priceFetcher
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
-		rates, err := pricing.FetchRates(ctx, region)
+		rates, err := fetcher(ctx, region)
 		return pricingMsg{rates: rates, err: err}
 	}
 }
 
 // warmCacheCmd fetches pricing for all regions except skip, populating the
 // on-disk cache so that future region switches are instant.
-func warmCacheCmd(regions []string, skip string) tea.Cmd {
+func (m Model) warmCacheCmd(regions []string, skip string) tea.Cmd {
+	fetcher := m.priceFetcher
 	return func() tea.Msg {
 		for _, region := range regions {
 			if region == skip {
 				continue
 			}
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			_, _ = pricing.FetchRates(ctx, region)
+			_, _ = fetcher(ctx, region)
 			cancel()
 		}
 		return cacheWarmMsg{}
@@ -244,7 +250,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.ratesErr = nil
 			if !m.cacheWarmed {
 				m.cacheWarmed = true
-				return m, warmCacheCmd(m.allRegions, m.pricingRegion)
+				return m, m.warmCacheCmd(m.allRegions, m.pricingRegion)
 			}
 		} else {
 			m.ratesErr = msg.err
@@ -409,7 +415,7 @@ func (m Model) handleRegionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pricingRegion = selected
 			m.ratesLoading = true
 			_ = prefs.Save(prefs.Prefs{Region: selected})
-			return m, fetchPricingCmd(selected)
+			return m, m.fetchPricingCmd(selected)
 		}
 		return m, nil
 	}

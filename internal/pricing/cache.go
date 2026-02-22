@@ -13,6 +13,8 @@ const cacheTTL = 24 * time.Hour
 
 const cacheSubdir = "aws-eks-calculator"
 
+var cacheJSONMarshal = json.Marshal
+
 // cachedRates is the on-disk format for cached pricing data.
 type cachedRates struct {
 	Rates     Rates     `json:"rates"`
@@ -69,7 +71,7 @@ func (c *Cache) Save(region string, rates Rates) error {
 		FetchedAt: c.now(),
 	}
 
-	data, err := json.Marshal(entry)
+	data, err := cacheJSONMarshal(entry)
 	if err != nil {
 		return err
 	}
