@@ -238,3 +238,57 @@ func TestTotalResourcesLabel(t *testing.T) {
 		t.Error("wrong kro total label")
 	}
 }
+
+func TestInputHintsForCapability(t *testing.T) {
+	for _, cap := range []calculator.Capability{
+		calculator.CapabilityArgoCD,
+		calculator.CapabilityACK,
+		calculator.CapabilityKro,
+	} {
+		hints := InputHintsForCapability(cap)
+		fields := InputFieldsForCapability(cap)
+		if len(hints) != len(fields) {
+			t.Errorf("cap %v: hints len %d != fields len %d", cap, len(hints), len(fields))
+		}
+		for i, h := range hints {
+			if h == "" {
+				t.Errorf("cap %v: hint %d is empty", cap, i)
+			}
+		}
+	}
+}
+
+func TestResourceLabelDefault(t *testing.T) {
+	got := resourceLabel(calculator.Capability(99))
+	if got != "Per-resource" {
+		t.Errorf("expected Per-resource for unknown capability, got %q", got)
+	}
+}
+
+func TestTotalResourcesLabelDefault(t *testing.T) {
+	got := totalResourcesLabel(calculator.Capability(99))
+	if got != "Total resources:" {
+		t.Errorf("expected 'Total resources:' for unknown capability, got %q", got)
+	}
+}
+
+func TestRenderBreakdownManagedCostsMore(t *testing.T) {
+	inputs := makeTestInputs(9)
+	input := calculator.ScenarioInput{
+		Capability:                  calculator.CapabilityArgoCD,
+		HoursPerMonth:               730,
+		NumClusters:                 1,
+		SelfManagedVCPUCostPerHour:  0.04048,
+		SelfManagedMemGBCostPerHour: 0.004446,
+	}
+	breakdown := calculator.CostBreakdown{
+		TotalMonthly:            200,
+		SelfManagedTotalMonthly: 100,
+		ManagedVsSelfManaged:    100,
+	}
+
+	output := RenderCalculator(calculator.CapabilityArgoCD, inputs, 0, input, breakdown, 120, 40)
+	if !strings.Contains(output, "AWS managed costs more") {
+		t.Error("should show 'AWS managed costs more' when diff > 0")
+	}
+}

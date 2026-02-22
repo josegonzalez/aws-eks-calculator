@@ -558,6 +558,112 @@ func TestFetchRatesZeroRateProducts(t *testing.T) {
 	}
 }
 
+func TestParseRateMalformedJSON(t *testing.T) {
+	_, err := parseRate("{invalid}")
+	if err == nil {
+		t.Fatal("expected error for malformed JSON")
+	}
+}
+
+func TestExtractRateInvalidUSD(t *testing.T) {
+	doc := productDoc{}
+	doc.Terms.OnDemand = map[string]struct {
+		PriceDimensions map[string]struct {
+			PricePerUnit map[string]string `json:"pricePerUnit"`
+			Unit         string            `json:"unit"`
+		} `json:"priceDimensions"`
+	}{
+		"offer1": {
+			PriceDimensions: map[string]struct {
+				PricePerUnit map[string]string `json:"pricePerUnit"`
+				Unit         string            `json:"unit"`
+			}{
+				"dim1": {
+					PricePerUnit: map[string]string{"USD": "notanumber"},
+					Unit:         "Hour",
+				},
+			},
+		},
+	}
+
+	_, err := extractRateFromDoc(doc)
+	if err == nil {
+		t.Fatal("expected error for invalid USD value")
+	}
+}
+
+func TestFetchSingleRateClientError(t *testing.T) {
+	mock := &mockPricingAPI{err: fmt.Errorf("connection refused")}
+	svc := "AmazonECS"
+	_, err := fetchSingleRate(context.Background(), mock, &pricing.GetProductsInput{
+		ServiceCode: &svc,
+	})
+	if err == nil {
+		t.Fatal("expected error from client")
+	}
+}
+
+func TestFetchFargateVCPUError(t *testing.T) {
+	// EKS succeeds, Fargate vCPU call returns error via selective mock
+	mock := &selectiveErrorMock{
+		responses: allCapabilityProducts("us-east-1"),
+		errOn:     "AmazonECS:regionCode=us-east-1:productFamily=Compute:cputype=perCPU",
+	}
+
+	rates, err := FetchRatesWithClient(context.Background(), mock, "us-east-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Fargate rates should remain defaults since vCPU fetch failed
+	defaults := DefaultRates()
+	if rates.FargateVCPUPerHour != defaults.FargateVCPUPerHour {
+		t.Errorf("FargateVCPUPerHour should be default, got %f", rates.FargateVCPUPerHour)
+	}
+}
+
+func TestFetchFargateMemError(t *testing.T) {
+	// EKS succeeds, Fargate vCPU succeeds, but memory call returns error
+	mock := &selectiveErrorMock{
+		responses: allCapabilityProducts("us-east-1"),
+		errOn:     "AmazonECS:regionCode=us-east-1:productFamily=Compute:memorytype=perGB",
+	}
+
+	rates, err := FetchRatesWithClient(context.Background(), mock, "us-east-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Fargate rates should remain defaults since memory fetch failed
+	defaults := DefaultRates()
+	if rates.FargateMemGBPerHour != defaults.FargateMemGBPerHour {
+		t.Errorf("FargateMemGBPerHour should be default, got %f", rates.FargateMemGBPerHour)
+	}
+}
+
+// selectiveErrorMock returns an error only for a specific key.
+type selectiveErrorMock struct {
+	responses map[string]*pricing.GetProductsOutput
+	errOn     string
+}
+
+func (m *selectiveErrorMock) GetProducts(ctx context.Context, params *pricing.GetProductsInput, optFns ...func(*pricing.Options)) (*pricing.GetProductsOutput, error) {
+	key := *params.ServiceCode
+	for _, f := range params.Filters {
+		key += ":" + *f.Field + "=" + *f.Value
+	}
+
+	if key == m.errOn {
+		return nil, fmt.Errorf("selective error on %s", key)
+	}
+
+	if resp, ok := m.responses[key]; ok {
+		return resp, nil
+	}
+
+	return &pricing.GetProductsOutput{PriceList: []string{}}, nil
+}
+
 func TestFetchPartialCapabilityFailure(t *testing.T) {
 	// Only ArgoCD products available; ACK and kro missing
 	mock := &mockPricingAPI{
